@@ -11,6 +11,9 @@ interface TgWebApp {
   initData: string
   colorScheme: 'light' | 'dark'
   ready(): void
+  setHeaderColor?(color: string): void
+  setBackgroundColor?(color: string): void
+  setBottomBarColor?(color: string): void
   expand(): void
   close(): void
   BackButton: TgButton
@@ -30,10 +33,16 @@ declare global {
 
 export const tg: TgWebApp | undefined = window.Telegram?.WebApp
 
+// index.css dagi --bg bilan bir xil: Telegram sarlavhasi va foni ilova bilan mos tursin.
+const APP_BG = '#17212b'
+
 export function initTelegram() {
   if (!tg) return
   tg.ready()
   tg.expand()
+  tg.setHeaderColor?.(APP_BG)
+  tg.setBackgroundColor?.(APP_BG)
+  tg.setBottomBarColor?.(APP_BG)
 }
 
 export const initData = () => tg?.initData ?? ''

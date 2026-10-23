@@ -1,26 +1,17 @@
-/* Ranglar Telegram mavzusidan olinadi (telegram-web-app.js --tg-theme-* o'zgaruvchilarni qo'yadi). */
+/* Dizayn Telegram mavzusidan (light/dark) qat'i nazar doim bir xil qorong'i palitrada. */
 :root {
-  --bg: var(--tg-theme-bg-color, #ffffff);
-  --bg2: var(--tg-theme-secondary-bg-color, #f2f2f7);
-  --text: var(--tg-theme-text-color, #111111);
-  --hint: var(--tg-theme-hint-color, #8e8e93);
-  --accent: var(--tg-theme-button-color, #2481cc);
-  --accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --bg: #17212b;
+  --bg2: #232e3c;
+  --text: #f5f5f5;
+  --hint: #7d8b99;
+  --accent: #2481cc;
+  --accent-text: #ffffff;
   --track: color-mix(in srgb, var(--hint) 20%, transparent);
   --income: #2e9e4f;
   --expense: #e2483d;
   --gold: #e0a100;
   --radius: 14px;
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: var(--tg-theme-bg-color, #17212b);
-    --bg2: var(--tg-theme-secondary-bg-color, #232e3c);
-    --text: var(--tg-theme-text-color, #f5f5f5);
-    --hint: var(--tg-theme-hint-color, #7d8b99);
-  }
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
