@@ -15,6 +15,7 @@ interface TgWebApp {
   setBackgroundColor?(color: string): void
   setBottomBarColor?(color: string): void
   expand(): void
+  disableVerticalSwipes?(): void
   close(): void
   BackButton: TgButton
   HapticFeedback?: {
@@ -40,6 +41,8 @@ export function initTelegram() {
   if (!tg) return
   tg.ready()
   tg.expand()
+  // Pastga surilganda Mini App yopilmasin (Bot API 7.7+)
+  tg.disableVerticalSwipes?.()
   tg.setHeaderColor?.(APP_BG)
   tg.setBackgroundColor?.(APP_BG)
   tg.setBottomBarColor?.(APP_BG)

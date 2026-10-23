@@ -15,6 +15,8 @@ function BackButton() {
   const location = useLocation()
   const nav = useNavigate()
   useEffect(() => {
+    // scroll konteyneri #root (index.css), yangi sahifa tepadan ochilsin
+    document.getElementById('root')?.scrollTo(0, 0)
     if (!tg) return
     const back = () => nav(-1)
     if (location.pathname === '/') tg.BackButton.hide()

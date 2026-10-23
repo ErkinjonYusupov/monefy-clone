@@ -16,6 +16,20 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* Scroll body'da emas, #root ichida: aks holda eski Telegram klientlarida
+   pastga tortish Mini App'ni yopadi. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -57,7 +71,7 @@ input:focus, select:focus { border-color: var(--accent); }
 .rot { transform: rotate(180deg); }
 
 .center-screen {
-  min-height: 100vh;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -160,7 +174,7 @@ input:focus, select:focus { border-color: var(--accent); }
 .period-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; font-weight: 600; }
 
 /* ---- home ---- */
-.home { display: flex; flex-direction: column; min-height: 100vh; max-width: 560px; margin: 0 auto; }
+.home { display: flex; flex-direction: column; min-height: 100%; max-width: 560px; margin: 0 auto; }
 .home-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px 6px; }
 .account-select { width: auto; flex: 1; font-weight: 600; background: transparent; padding-left: 0; }
 
@@ -195,7 +209,7 @@ input:focus, select:focus { border-color: var(--accent); }
 .balance-bar small { font-size: 13px; }
 
 /* ---- tx form ---- */
-.tx-form { display: flex; flex-direction: column; min-height: 100vh; max-width: 560px; margin: 0 auto; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
+.tx-form { display: flex; flex-direction: column; min-height: 100%; max-width: 560px; margin: 0 auto; padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
 .tx-header { display: flex; align-items: center; gap: 8px; }
 .tx-header .seg { flex: 1; }
 .amount-display {
