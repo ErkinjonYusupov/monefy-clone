@@ -9,6 +9,9 @@ export interface Me {
   budget_amount: number | null
   premium_until: string | null
   is_premium: boolean
+  is_admin: boolean
+  phone: string
+  phone_required: boolean
 }
 
 export interface Account {
@@ -74,6 +77,15 @@ export interface Summary {
   balance: number
   categories: CategoryTotal[]
   missing_rates: string[]
+  by_currency: CurrencyTotal[]
+}
+
+// Bitta valyuta bo'yicha, kursga o'girilmagan summalar
+export interface CurrencyTotal {
+  currency: string
+  income: number
+  expense: number
+  balance: number
 }
 
 export interface Plan {
@@ -99,4 +111,35 @@ export interface PremiumInfo {
   plans: Plan[]
   features: string[]
   subscriptions: Subscription[]
+}
+
+export interface AdminUser {
+  id: number
+  telegram_id: number
+  first_name: string
+  last_name: string
+  username: string
+  phone: string
+  premium_until: string | null
+  is_premium: boolean
+  created_at: string
+  last_seen_at: string
+}
+
+export interface AdminUserPage {
+  items: AdminUser[]
+  total: number
+  page: number
+  pages: number
+}
+
+export interface AdminUserDetail {
+  user: AdminUser
+  subscriptions: Subscription[]
+  options: Plan[]
+}
+
+export interface AdminStats {
+  users: { total: number; premium: number; new_today: number; active_week: number }
+  revenue: { month_count: number; month_amount: number; total_count: number; total_amount: number }
 }

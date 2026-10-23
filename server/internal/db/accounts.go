@@ -103,8 +103,9 @@ func (s *Store) CountAccounts(ctx context.Context, userID int64) (int, error) {
 	return n, err
 }
 
-// SetAllAccountsCurrency bepul tarifda asosiy valyuta o'zgarganda barcha hisoblarni ham o'zgartiradi.
-func (s *Store) SetAllAccountsCurrency(ctx context.Context, userID int64, currency string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE accounts SET currency=$2 WHERE user_id=$1`, userID, currency)
+// RenameBaseCurrency bepul tarifda asosiy valyuta o'zgarganda shu valyutadagi hisoblarni ham o'zgartiradi.
+// Boshqa valyutadagi hisoblarga (premium davrida ochilgan) tegilmaydi: aks holda 100 USD 100 RUB bo'lib qolardi.
+func (s *Store) RenameBaseCurrency(ctx context.Context, userID int64, from, to string) error {
+	_, err := s.pool.Exec(ctx, `UPDATE accounts SET currency=$3 WHERE user_id=$1 AND currency=$2`, userID, from, to)
 	return err
 }

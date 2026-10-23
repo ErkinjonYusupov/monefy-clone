@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"sort"
 	"strconv"
@@ -32,7 +33,51 @@ type TelegramUser struct {
 
 // Validate imzoni tekshiradi va foydalanuvchini qaytaradi. maxAge <= 0 bo'lsa muddat tekshirilmaydi.
 func Validate(initData, botToken string, maxAge time.Duration) (*TelegramUser, error) {
-	values, err := url.ParseQuery(initData)
+	values, err := verify(initData, botToken, maxAge)
+	if err != nil {
+		return nil, err
+	}
+	raw := values.Get("user")
+	if raw == "" {
+		return nil, ErrNoUser
+	}
+	var u TelegramUser
+	if err := json.Unmarshal([]byte(raw), &u); err != nil {
+		return nil, err
+	}
+	if u.ID == 0 {
+		return nil, ErrNoUser
+	}
+	return &u, nil
+}
+
+type Contact struct {
+	UserID      int64  `json:"user_id"`
+	PhoneNumber string `json:"phone_number"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+}
+
+// ValidateContact WebApp.requestContact() javobini tekshiradi. Telegram uni initData kabi
+// bot tokeni bilan imzolaydi, shuning uchun kontakt soxtalashtirilmaganiga ishonsa bo'ladi.
+func ValidateContact(response, botToken string, maxAge time.Duration) (*Contact, error) {
+	values, err := verify(response, botToken, maxAge)
+	if err != nil {
+		return nil, err
+	}
+	var c Contact
+	if err := json.Unmarshal([]byte(values.Get("contact")), &c); err != nil {
+		return nil, fmt.Errorf("contact: %w", err)
+	}
+	if c.UserID == 0 || c.PhoneNumber == "" {
+		return nil, errors.New("contact: incomplete")
+	}
+	return &c, nil
+}
+
+// verify "k=v&...&hash=..." ko'rinishidagi Telegram ma'lumotining HMAC imzosini tekshiradi.
+func verify(data, botToken string, maxAge time.Duration) (url.Values, error) {
+	values, err := url.ParseQuery(data)
 	if err != nil {
 		return nil, err
 	}
@@ -66,19 +111,7 @@ func Validate(initData, botToken string, maxAge time.Duration) (*TelegramUser, e
 			return nil, ErrExpired
 		}
 	}
-
-	raw := values.Get("user")
-	if raw == "" {
-		return nil, ErrNoUser
-	}
-	var u TelegramUser
-	if err := json.Unmarshal([]byte(raw), &u); err != nil {
-		return nil, err
-	}
-	if u.ID == 0 {
-		return nil, ErrNoUser
-	}
-	return &u, nil
+	return values, nil
 }
 
 func hmacSHA256(key, msg []byte) []byte {

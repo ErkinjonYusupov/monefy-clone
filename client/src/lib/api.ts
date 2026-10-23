@@ -1,6 +1,7 @@
 import { initData } from './telegram'
 import type {
-  Account, Category, Me, PremiumInfo, Rate, Summary, Transaction, Transfer,
+  Account, AdminStats, AdminUserDetail, AdminUserPage, Category, Me, PremiumInfo, Rate, Summary,
+  Transaction, Transfer,
 } from './types'
 
 const BASE = import.meta.env.VITE_API_URL ?? '/api'
@@ -46,6 +47,7 @@ export type PeriodQuery = { from?: string; to?: string }
 
 export const api = {
   me: () => request<Me>('GET', '/me'),
+  savePhone: (response: string) => request<Me>('POST', '/me/phone', { response }),
   updateSettings: (body: { base_currency?: string; budget_amount?: number; clear_budget?: boolean }) =>
     request<Me>('PATCH', '/me/settings', body),
 
@@ -80,6 +82,15 @@ export const api = {
 
   premium: () => request<PremiumInfo>('GET', '/premium'),
   requestPremium: (plan: string) => request<{ ok: boolean }>('POST', '/premium/request', { plan }),
+
+  admin: {
+    stats: () => request<AdminStats>('GET', '/admin/stats'),
+    users: (q: string, page: number) => request<AdminUserPage>('GET', '/admin/users' + qs({ q, page })),
+    user: (id: number) => request<AdminUserDetail>('GET', `/admin/users/${id}`),
+    grant: (id: number, plan: string, amount?: number) =>
+      request<AdminUserDetail>('POST', `/admin/users/${id}/premium`, { plan, amount }),
+    revoke: (id: number) => request<AdminUserDetail>('POST', `/admin/users/${id}/revoke`),
+  },
 }
 
 export type TxBody = {

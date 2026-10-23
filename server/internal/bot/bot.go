@@ -55,6 +55,10 @@ func (b *Bot) reply(ctx context.Context, chatID int64, text string) {
 }
 
 func (b *Bot) handle(ctx context.Context, m *Message) {
+	if m.Contact != nil {
+		b.contact(ctx, m)
+		return
+	}
 	fields := strings.Fields(m.Text)
 	if len(fields) == 0 || !strings.HasPrefix(fields[0], "/") {
 		return
@@ -91,7 +95,7 @@ func (b *Bot) handle(ctx context.Context, m *Message) {
 const adminHelp = `<b>Admin buyruqlari</b>
 /stats — foydalanuvchilar va tushum
 /user &lt;telegram_id&gt; — foydalanuvchi va obunalari
-/grant &lt;telegram_id&gt; &lt;month|year|lifetime|30d&gt; [summa] — premium berish
+/grant &lt;telegram_id&gt; &lt;week|month|3month|6month|year|lifetime|30d&gt; [summa] — premium berish
 /revoke &lt;telegram_id&gt; — premiumni bekor qilish
 
 Summa so'mda, ko'rsatilmasa reja narxi yoziladi (30d uchun 0).`
@@ -163,6 +167,7 @@ func (b *Bot) userInfo(ctx context.Context, chatID int64, args []string) {
 	}
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "<b>%s</b>\n", UserLabel(u))
+	fmt.Fprintf(&sb, "Telefon: %s\n", phoneText(u.Phone))
 	fmt.Fprintf(&sb, "Ro'yxatdan o'tgan: %s\n", u.CreatedAt.Format("2006-01-02"))
 	fmt.Fprintf(&sb, "Premium: %s\n", PremiumStatus(u))
 	if len(subs) > 0 {
@@ -212,7 +217,7 @@ func (b *Bot) grant(ctx context.Context, chatID, adminID int64, args []string) {
 	}
 	b.reply(ctx, chatID, fmt.Sprintf("✅ %s ga premium berildi (%s), %s gacha. Summa: %s so'm",
 		UserLabel(u), plan.Title, untilText(sub.ExpiresAt), service.FormatMoney(amount)))
-	b.reply(ctx, u.TelegramID, fmt.Sprintf("🎉 Premium faollashtirildi: %s gacha. Rahmat!", untilText(sub.ExpiresAt)))
+	b.NotifyPremium(ctx, u, sub)
 }
 
 func (b *Bot) revoke(ctx context.Context, chatID int64, args []string) {
@@ -225,6 +230,27 @@ func (b *Bot) revoke(ctx context.Context, chatID int64, args []string) {
 		return
 	}
 	b.reply(ctx, chatID, fmt.Sprintf("Premium bekor qilindi: %s", UserLabel(u)))
+}
+
+// contact Mini App'dagi requestContact() natijasi botga ham kontakt xabari bo'lib keladi.
+// Faqat foydalanuvchi o'z raqamini yuborgan bo'lsa saqlanadi.
+func (b *Bot) contact(ctx context.Context, m *Message) {
+	if m.From == nil || m.Contact.UserID != m.From.ID {
+		b.reply(ctx, m.Chat.ID, "Iltimos, o'zingizning telefon raqamingizni yuboring.")
+		return
+	}
+	if _, err := b.store.SetPhone(ctx, m.From.ID, service.NormalizePhone(m.Contact.PhoneNumber)); err != nil {
+		if !errors.Is(err, db.ErrNotFound) {
+			slog.Warn("bot save phone", "err", err)
+		}
+		return
+	}
+	b.reply(ctx, m.Chat.ID, "✅ Raqamingiz tasdiqlandi. Ilovaga qaytishingiz mumkin.")
+}
+
+// NotifyPremium foydalanuvchiga premium berilgani haqida xabar yuboradi.
+func (b *Bot) NotifyPremium(ctx context.Context, u *db.User, sub *db.Subscription) {
+	b.reply(ctx, u.TelegramID, fmt.Sprintf("🎉 Premium faollashtirildi: %s gacha. Rahmat!", untilText(sub.ExpiresAt)))
 }
 
 // NotifyAdmin admin chatiga xabar yuboradi (ADMIN_CHAT_ID bo'lmasa hech narsa qilmaydi).
@@ -244,6 +270,13 @@ func UserLabel(u *db.User) string {
 		label += " @" + html.EscapeString(u.Username)
 	}
 	return fmt.Sprintf("%s (<code>%d</code>)", label, u.TelegramID)
+}
+
+func phoneText(p string) string {
+	if p == "" {
+		return "yo'q"
+	}
+	return p
 }
 
 func PremiumStatus(u *db.User) string {

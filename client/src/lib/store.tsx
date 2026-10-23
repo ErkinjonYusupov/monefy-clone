@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from './api'
+import { clearCache } from './cache'
+import PhoneGate from '../components/PhoneGate'
 import type { Period } from './format'
 import type { Account, Category, Me } from './types'
 
@@ -35,7 +37,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    const [m, a, c] = await Promise.all([api.me(), api.accounts(), api.categories()])
+    clearCache()
+    const m = await api.me()
+    // Raqam ulashilmaguncha boshqa ma'lumotlar yopiq (server 403 qaytaradi)
+    if (m.phone_required) {
+      setMe(m)
+      return
+    }
+    const [a, c] = await Promise.all([api.accounts(), api.categories()])
     setMe(m)
     setAccounts(a)
     setCategories(c)
@@ -61,5 +70,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     )
   }
   if (!value) return <div className="center-screen muted">Yuklanmoqda…</div>
+  if (value.me.phone_required) return <PhoneGate onDone={refresh} />
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

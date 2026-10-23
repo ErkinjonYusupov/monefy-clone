@@ -1,7 +1,7 @@
 import { ArrowRightLeft, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Page, PremiumLock } from '../components/ui'
+import { MoneyInput, Page, PremiumLock } from '../components/ui'
 import { api } from '../lib/api'
 import { CURRENCIES, currencyLabel, formatMoney, parseMoney, toInput, ymd } from '../lib/format'
 import { ACCOUNT_ICONS, Icon } from '../lib/icons'
@@ -94,7 +94,7 @@ export function AccountForm() {
       {!me.is_premium && <PremiumLock text="Boshqa valyutadagi hisoblar — Premium" />}
       <label className="field">
         <span>Boshlang'ich qoldiq ({currencyLabel(currency)})</span>
-        <input inputMode="decimal" value={initial} onChange={(e) => setInitial(e.target.value)} placeholder="0" />
+        <MoneyInput value={initial} onChange={setInitial} allowNegative placeholder="0" />
       </label>
       <div className="field">
         <span>Ikonka</span>
@@ -165,12 +165,12 @@ export function TransferForm() {
       </label>
       <label className="field">
         <span>Summa ({currencyLabel(fromAcc?.currency ?? '')})</span>
-        <input inputMode="decimal" value={amountFrom} onChange={(e) => setAmountFrom(e.target.value)} placeholder="0" />
+        <MoneyInput value={amountFrom} onChange={setAmountFrom} placeholder="0" />
       </label>
       {!sameCurrency && (
         <label className="field">
           <span>Tushadigan summa ({currencyLabel(toAcc?.currency ?? '')})</span>
-          <input inputMode="decimal" value={amountTo} onChange={(e) => setAmountTo(e.target.value)} placeholder="0" />
+          <MoneyInput value={amountTo} onChange={setAmountTo} placeholder="0" />
         </label>
       )}
       <label className="field">

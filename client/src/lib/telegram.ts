@@ -16,6 +16,8 @@ interface TgWebApp {
   setBottomBarColor?(color: string): void
   expand(): void
   disableVerticalSwipes?(): void
+  isVersionAtLeast?(version: string): boolean
+  requestContact?(cb: (shared: boolean, res?: { response?: string }) => void): void
   close(): void
   BackButton: TgButton
   HapticFeedback?: {
@@ -74,3 +76,17 @@ export function alertDialog(message: string): Promise<void> {
     }
   })
 }
+
+// requestPhone Telegram'ning "raqamni ulashish" oynasini ochadi (Bot API 6.9+).
+// response — Telegram imzolagan kontakt; server uni tekshiradi.
+export function requestPhone(): Promise<{ shared: boolean; response?: string }> {
+  return new Promise((resolve) => {
+    if (!tg?.requestContact || !tg.isVersionAtLeast?.('6.9')) {
+      resolve({ shared: false })
+      return
+    }
+    tg.requestContact((shared, res) => resolve({ shared, response: res?.response }))
+  })
+}
+
+export const canRequestPhone = () => Boolean(tg?.requestContact && tg.isVersionAtLeast?.('6.9'))

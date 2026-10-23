@@ -1,21 +1,18 @@
 import { Menu, Minus, Plus } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CategoryBadge, Donut, PeriodBar } from '../components/ui'
 import { api } from '../lib/api'
+import { useCached } from '../lib/cache'
 import { formatMoney, periodRange } from '../lib/format'
 import { useApp } from '../lib/store'
-import type { Summary } from '../lib/types'
 
 export default function Home() {
   const { me, accounts, categories, period, accountId, setAccountId, revision } = useApp()
   const nav = useNavigate()
-  const [summary, setSummary] = useState<Summary | null>(null)
   const range = periodRange(period)
-
-  useEffect(() => {
-    api.summary({ from: range.from, to: range.to, account_id: accountId }).then(setSummary).catch(console.error)
-  }, [range.from, range.to, accountId, revision])
+  const summary = useCached(`summary|${range.from}|${range.to}|${accountId}`, revision,
+    () => api.summary({ from: range.from, to: range.to, account_id: accountId }))
 
   const totals = new Map(summary?.categories.map((c) => [c.category_id, c.total]))
   const expenseCats = categories.filter((c) => c.kind === 'expense' && !c.is_archived)
@@ -24,14 +21,28 @@ export default function Home() {
     .filter((s) => s.value > 0)
 
   const cur = summary?.currency ?? me.base_currency
-  const budgetLeft = me.budget_amount != null && period.type === 'month' && summary
+  // Budjet asosiy valyutada, shuning uchun faqat "Barcha hisoblar"da ko'rsatiladi
+  const budgetLeft = me.budget_amount != null && period.type === 'month' && accountId === 0 && summary
     ? me.budget_amount - summary.expense
     : null
+  // Bir nechta valyuta bo'lsa, har biri alohida ko'rsatiladi (kursga o'girilmasdan)
+  const byCur = summary?.by_currency ?? []
+  const multi = byCur.length > 1
+  const active = byCur.filter((c) => c.income || c.expense)
 
   // Kategoriya ikonkalari donut atrofida aylana bo'ylab joylashadi (Monefy kabi).
-  const ringSize = Math.min(window.innerWidth - 32, 380)
+  // Aylana o'rtadagi bo'sh joyga (kenglik va balandlik) sig'adigan qilib o'lchanadi,
+  // shunda tugmalar va balans qatori har doim ekranda qoladi.
+  const areaRef = useRef<HTMLDivElement>(null)
+  const area = useElementSize(areaRef)
+  const ringSize = Math.max(200, Math.min(area.width - 8, area.height - 4, 400))
   const donutSize = ringSize * 0.56
-  const radius = ringSize / 2 - 26
+  // Kategoriya ko'p bo'lsa ikonkalar ustma-ust tushmasligi uchun kichrayadi
+  const approxRadius = ringSize / 2 - 22
+  const badge = Math.max(24, Math.min(40, Math.floor((2 * Math.PI * approxRadius) / Math.max(expenseCats.length, 1)) - 6))
+  const radius = ringSize / 2 - badge / 2 - 2
+  // Markazdagi summalar halqa ichiga sig'ishi uchun shrift aylana bilan birga kichrayadi
+  const centerFont = Math.max(11, Math.min(17, Math.round(donutSize * 0.085)))
 
   return (
     <div className="home">
@@ -49,29 +60,44 @@ export default function Home() {
 
       <PeriodBar />
 
-      <div className="ring" style={{ width: ringSize, height: ringSize }}>
-        {expenseCats.map((c, i) => {
-          const angle = (i / expenseCats.length) * 2 * Math.PI - Math.PI / 2
-          const x = ringSize / 2 + radius * Math.cos(angle)
-          const y = ringSize / 2 + radius * Math.sin(angle)
-          const has = (totals.get(c.id) ?? 0) > 0
-          return (
-            <button
-              key={c.id}
-              className={`ring-item ${has ? '' : 'dim'}`}
-              style={{ left: x, top: y }}
-              onClick={() => nav(`/add/expense?category=${c.id}`)}
-              title={c.name}
-            >
-              <CategoryBadge icon={c.icon} color={c.color} size={40} />
-            </button>
-          )
-        })}
-        <div className="ring-center" onClick={() => nav('/transactions')}>
-          <Donut slices={slices} size={donutSize} thickness={donutSize * 0.12}>
-            <div className="income">{formatMoney(summary?.income ?? 0)}</div>
-            <div className="expense">{formatMoney(summary?.expense ?? 0)}</div>
-          </Donut>
+      <div className="ring-area" ref={areaRef}>
+        <div className="ring" style={{ width: ringSize, height: ringSize }}>
+          {expenseCats.map((c, i) => {
+            const angle = (i / expenseCats.length) * 2 * Math.PI - Math.PI / 2
+            const x = ringSize / 2 + radius * Math.cos(angle)
+            const y = ringSize / 2 + radius * Math.sin(angle)
+            const has = (totals.get(c.id) ?? 0) > 0
+            return (
+              <button
+                key={c.id}
+                className={`ring-item ${has ? '' : 'dim'}`}
+                style={{ left: x, top: y }}
+                onClick={() => nav(`/add/expense?category=${c.id}`)}
+                title={c.name}
+              >
+                <CategoryBadge icon={c.icon} color={c.color} size={badge} />
+              </button>
+            )
+          })}
+          <div className="ring-center" onClick={() => nav('/transactions')}>
+            <Donut slices={slices} size={donutSize} thickness={donutSize * 0.12}>
+              <div style={{ fontSize: centerFont }}>
+                {multi ? (
+                  active.length === 0 ? <div className="muted">0</div> : active.map((c) => (
+                    <div key={c.currency} className="cur-lines">
+                      {c.income > 0 && <div className="income">+{formatMoney(c.income, c.currency)}</div>}
+                      {c.expense > 0 && <div className="expense">−{formatMoney(c.expense, c.currency)}</div>}
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div className="income">{formatMoney(summary?.income ?? 0)}</div>
+                    <div className="expense">{formatMoney(summary?.expense ?? 0)}</div>
+                  </>
+                )}
+              </div>
+            </Donut>
+          </div>
         </div>
       </div>
 
@@ -92,11 +118,34 @@ export default function Home() {
 
       <button className="balance-bar" onClick={() => nav('/transactions')}>
         <span>Balans</span>
-        <strong className={summary && summary.balance < 0 ? 'neg' : ''}>{formatMoney(summary?.balance ?? 0, cur)}</strong>
+        {multi ? (
+          <>
+            <strong className="cur-balances">
+              {byCur.map((c) => (
+                <span key={c.currency} className={c.balance < 0 ? 'neg' : ''}>{formatMoney(c.balance, c.currency)}</span>
+              ))}
+            </strong>
+            <small className="muted">Jami ≈ {formatMoney(summary?.balance ?? 0, cur)}</small>
+          </>
+        ) : (
+          <strong className={summary && summary.balance < 0 ? 'neg' : ''}>{formatMoney(summary?.balance ?? 0, cur)}</strong>
+        )}
         {budgetLeft != null && (
           <small className={budgetLeft < 0 ? 'neg' : ''}>Budjet qoldig'i: {formatMoney(budgetLeft, cur)}</small>
         )}
       </button>
     </div>
   )
+}
+
+function useElementSize(ref: React.RefObject<HTMLElement | null>) {
+  const [size, setSize] = useState({ width: window.innerWidth, height: window.innerWidth })
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setSize({ width: e.contentRect.width, height: e.contentRect.height }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return size
 }

@@ -13,6 +13,8 @@ type User struct {
 	BudgetAmount *int64     `json:"budget_amount"`
 	PremiumUntil *time.Time `json:"premium_until"`
 	CreatedAt    time.Time  `json:"created_at"`
+	LastSeenAt   time.Time  `json:"last_seen_at"`
+	Phone        string     `json:"phone"`
 }
 
 func (u *User) IsPremium() bool {
@@ -91,6 +93,15 @@ type Summary struct {
 	Balance      int64           `json:"balance"` // davr oxirigacha jami qoldiq
 	Categories   []CategoryTotal `json:"categories"`
 	MissingRates []string        `json:"missing_rates"`
+	ByCurrency   []CurrencyTotal `json:"by_currency"`
+}
+
+// CurrencyTotal bitta valyuta bo'yicha, o'girilmagan summalar.
+type CurrencyTotal struct {
+	Currency string `json:"currency"`
+	Income   int64  `json:"income"`
+	Expense  int64  `json:"expense"`
+	Balance  int64  `json:"balance"`
 }
 
 type CategoryTotal struct {

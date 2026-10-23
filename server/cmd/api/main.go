@@ -62,6 +62,7 @@ func run() error {
 	if os.Getenv("BOT_POLLING") != "false" {
 		go b.Run(ctx)
 	}
+	go b.RunReminders(ctx)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

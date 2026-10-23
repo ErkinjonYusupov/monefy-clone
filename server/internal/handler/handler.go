@@ -41,39 +41,55 @@ func (h *Handler) Routes(staticDir string) http.Handler {
 	r.Route("/api", func(r chi.Router) {
 		r.Use(h.authenticate)
 
+		// Telefon raqamisiz ham ochiq: ilova shu orqali raqam so'raydi
 		r.Get("/me", h.me)
-		r.Patch("/me/settings", h.updateSettings)
+		r.Post("/me/phone", h.savePhone)
 
-		r.Get("/accounts", h.listAccounts)
-		r.Post("/accounts", h.createAccount)
-		r.Patch("/accounts/{id}", h.updateAccount)
-		r.Delete("/accounts/{id}", h.deleteAccount)
+		r.Group(func(r chi.Router) {
+			r.Use(h.requirePhone)
 
-		r.Get("/categories", h.listCategories)
-		r.With(h.requirePremium).Post("/categories", h.createCategory)
-		r.With(h.requirePremium).Patch("/categories/{id}", h.updateCategory)
-		r.With(h.requirePremium).Delete("/categories/{id}", h.deleteCategory)
+			r.Patch("/me/settings", h.updateSettings)
 
-		r.Get("/transactions", h.listTransactions)
-		r.Post("/transactions", h.createTransaction)
-		r.Get("/transactions/{id}", h.getTransaction)
-		r.Patch("/transactions/{id}", h.updateTransaction)
-		r.Delete("/transactions/{id}", h.deleteTransaction)
+			r.Get("/accounts", h.listAccounts)
+			r.Post("/accounts", h.createAccount)
+			r.Patch("/accounts/{id}", h.updateAccount)
+			r.Delete("/accounts/{id}", h.deleteAccount)
 
-		r.Get("/transfers", h.listTransfers)
-		r.Post("/transfers", h.createTransfer)
-		r.Delete("/transfers/{id}", h.deleteTransfer)
+			r.Get("/categories", h.listCategories)
+			r.With(h.requirePremium).Post("/categories", h.createCategory)
+			r.With(h.requirePremium).Patch("/categories/{id}", h.updateCategory)
+			r.With(h.requirePremium).Delete("/categories/{id}", h.deleteCategory)
 
-		r.Get("/summary", h.summary)
+			r.Get("/transactions", h.listTransactions)
+			r.Post("/transactions", h.createTransaction)
+			r.Get("/transactions/{id}", h.getTransaction)
+			r.Patch("/transactions/{id}", h.updateTransaction)
+			r.Delete("/transactions/{id}", h.deleteTransaction)
 
-		r.Get("/rates", h.listRates)
-		r.With(h.requirePremium).Put("/rates/{currency}", h.upsertRate)
-		r.With(h.requirePremium).Delete("/rates/{currency}", h.deleteRate)
+			r.Get("/transfers", h.listTransfers)
+			r.Post("/transfers", h.createTransfer)
+			r.Delete("/transfers/{id}", h.deleteTransfer)
 
-		r.With(h.requirePremium).Post("/export", h.export)
+			r.Get("/summary", h.summary)
 
-		r.Get("/premium", h.premiumInfo)
-		r.Post("/premium/request", h.premiumRequest)
+			r.Get("/rates", h.listRates)
+			r.With(h.requirePremium).Put("/rates/{currency}", h.upsertRate)
+			r.With(h.requirePremium).Delete("/rates/{currency}", h.deleteRate)
+
+			r.With(h.requirePremium).Post("/export", h.export)
+
+			r.Get("/premium", h.premiumInfo)
+			r.Post("/premium/request", h.premiumRequest)
+
+			r.Route("/admin", func(r chi.Router) {
+				r.Use(h.requireAdmin)
+				r.Get("/stats", h.adminStats)
+				r.Get("/users", h.adminUsers)
+				r.Get("/users/{id}", h.adminUser)
+				r.Post("/users/{id}/premium", h.adminGrant)
+				r.Post("/users/{id}/revoke", h.adminRevoke)
+			})
+		})
 	})
 
 	if staticDir != "" {
@@ -92,12 +108,17 @@ func (h *Handler) Routes(staticDir string) http.Handler {
 // ---- middleware ----
 
 type ctxKey struct{}
+type devKey struct{}
 
 func userFrom(r *http.Request) *db.User { return r.Context().Value(ctxKey{}).(*db.User) }
+
+// isDev so'rov DEV_TELEGRAM_ID orqali (Telegram'siz, lokal brauzerda) kirganmi.
+func isDev(r *http.Request) bool { return r.Context().Value(devKey{}) != nil }
 
 func (h *Handler) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var tg *auth.TelegramUser
+		dev := false
 		initData, ok := strings.CutPrefix(r.Header.Get("Authorization"), "tma ")
 		switch {
 		case ok && initData != "":
@@ -109,12 +130,13 @@ func (h *Handler) authenticate(next http.Handler) http.Handler {
 			tg = u
 		case h.cfg.DevTelegramID != 0:
 			tg = &auth.TelegramUser{ID: h.cfg.DevTelegramID, FirstName: "Dev"}
+			dev = true
 		default:
 			writeErr(w, http.StatusUnauthorized, "unauthorized", "missing Telegram initData")
 			return
 		}
 
-		u, created, err := h.store.UpsertUser(r.Context(), db.UpsertUser{
+		u, created, err := h.store.AuthUser(r.Context(), db.UpsertUser{
 			TelegramID: tg.ID, FirstName: tg.FirstName, LastName: tg.LastName,
 			Username: tg.Username, LanguageCode: tg.LanguageCode,
 		})
@@ -125,7 +147,38 @@ func (h *Handler) authenticate(next http.Handler) http.Handler {
 		if created {
 			go h.bot.NotifyAdmin(context.Background(), "🆕 Yangi foydalanuvchi: "+bot.UserLabel(u))
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))
+		ctx := context.WithValue(r.Context(), ctxKey{}, u)
+		if dev {
+			ctx = context.WithValue(ctx, devKey{}, true)
+		}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// requirePhone telefon raqamini ulashmagan foydalanuvchiga ilovadan foydalanishga ruxsat bermaydi.
+// Lokal dev rejimda (Telegram yo'q, raqam so'rab bo'lmaydi) tekshirilmaydi.
+func (h *Handler) requirePhone(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if userFrom(r).Phone == "" && !isDev(r) {
+			writeErr(w, http.StatusForbidden, "phone_required", "Telefon raqamingizni ulashing")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (h *Handler) isAdmin(u *db.User) bool {
+	return h.cfg.AdminChatID != 0 && u.TelegramID == h.cfg.AdminChatID
+}
+
+// requireAdmin admin = telegram_id ADMIN_CHAT_ID ga teng foydalanuvchi (shaxsiy chat ID = user ID).
+func (h *Handler) requireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !h.isAdmin(userFrom(r)) {
+			writeErr(w, http.StatusForbidden, "forbidden", "Ruxsat yo'q")
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

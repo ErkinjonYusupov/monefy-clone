@@ -124,6 +124,10 @@ type Message struct {
 		FirstName string `json:"first_name"`
 		Username  string `json:"username"`
 	} `json:"from"`
+	Contact *struct {
+		PhoneNumber string `json:"phone_number"`
+		UserID      int64  `json:"user_id"`
+	} `json:"contact"`
 }
 
 func (c *Client) GetUpdates(ctx context.Context, offset int64) ([]Update, error) {

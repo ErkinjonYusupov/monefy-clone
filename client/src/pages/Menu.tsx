@@ -1,7 +1,7 @@
-import { ChevronRight, Coins, Crown, FileDown, List, Shapes, Wallet } from 'lucide-react'
+import { ChevronRight, Coins, Crown, FileDown, List, Shapes, ShieldCheck, Wallet } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Page, PremiumLock } from '../components/ui'
+import { MoneyInput, Page, PremiumLock } from '../components/ui'
 import { api } from '../lib/api'
 import { CURRENCIES, parseMoney, periodRange, toInput } from '../lib/format'
 import { useApp } from '../lib/store'
@@ -30,7 +30,7 @@ export function Menu() {
     if (cur === me.base_currency) return
     const msg = me.is_premium
       ? `Asosiy valyuta ${cur} bo'ladi. Boshqa valyutalar kurslarini qayta tekshiring.`
-      : `Barcha hisoblar valyutasi ${cur} ga o'zgaradi (summalar o'zgarmaydi). Davom etasizmi?`
+      : `${me.base_currency} dagi hisoblar valyutasi ${cur} ga o'zgaradi (summalar o'zgarmaydi). Davom etasizmi?`
     if (!(await confirmDialog(msg))) return
     setMe(await api.updateSettings({ base_currency: cur }))
     await refresh()
@@ -68,6 +68,17 @@ export function Menu() {
         <ChevronRight size={18} />
       </button>
 
+      {me.is_admin && (
+        <button className="premium-card admin" onClick={() => nav('/admin')}>
+          <ShieldCheck size={26} />
+          <div className="grow">
+            <strong>Admin panel</strong>
+            <small>Foydalanuvchilar va obunalar</small>
+          </div>
+          <ChevronRight size={18} />
+        </button>
+      )}
+
       <ul className="list">
         <Row icon={<List size={20} />} label="Yozuvlar" onClick={() => nav('/transactions')} />
         <Row icon={<Wallet size={20} />} label="Hisoblar" onClick={() => nav('/accounts')} />
@@ -85,7 +96,7 @@ export function Menu() {
       <label className="field">
         <span>Oylik budjet (bo'sh = o'chiq)</span>
         <div className="inline">
-          <input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="Masalan 5000000" />
+          <MoneyInput value={budget} onChange={setBudget} placeholder="Masalan 5 000 000" />
           <button className="btn" onClick={saveBudget}>Saqlash</button>
         </div>
       </label>
@@ -123,7 +134,7 @@ export function Rates() {
     .filter((c) => c !== me.base_currency)
 
   const save = async (cur: string) => {
-    const v = (edit[cur] ?? '').replace(',', '.').trim()
+    const v = (edit[cur] ?? '').replace(/\.$/, '')
     try {
       setRates(await api.setRate(cur, v))
       haptic('success')
@@ -144,11 +155,11 @@ export function Rates() {
           <label key={cur} className="field">
             <span>1 {cur} = ? {me.base_currency}</span>
             <div className="inline">
-              <input
-                inputMode="decimal"
+              <MoneyInput
+                decimals={8}
                 disabled={!me.is_premium}
                 value={edit[cur] ?? (r ? String(Number(r.rate)) : '')}
-                onChange={(e) => setEdit({ ...edit, [cur]: e.target.value })}
+                onChange={(v) => setEdit({ ...edit, [cur]: v })}
                 placeholder="Kurs"
               />
               <button className="btn" disabled={!me.is_premium} onClick={() => save(cur)}>Saqlash</button>

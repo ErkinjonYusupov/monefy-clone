@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { HashRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AccountForm, Accounts, TransferForm } from './pages/Accounts'
+import { AdminHome, AdminUsers, AdminUserView } from './pages/Admin'
 import { Categories, CategoryForm } from './pages/Categories'
 import Home from './pages/Home'
 import { Menu, Rates } from './pages/Menu'
@@ -47,7 +48,10 @@ export default function App() {
           <Route path="/rates" element={<Rates />} />
           <Route path="/menu" element={<Menu />} />
           <Route path="/premium" element={<Premium />} />
-          <Route path="*" element={<Home />} />
+          <Route path="/admin" element={<AdminHome />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/users/:id" element={<AdminUserView />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </HashRouter>
     </AppProvider>

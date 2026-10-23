@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Crown } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PERIOD_LABELS, periodRange, type PeriodType } from '../lib/format'
+import { cleanAmount, groupDigits, PERIOD_LABELS, periodRange, type PeriodType } from '../lib/format'
 import { Icon } from '../lib/icons'
 import { useApp } from '../lib/store'
 
@@ -103,5 +103,50 @@ export function Donut({ slices, size = 200, thickness = 26, children }: {
       </svg>
       <div className="donut-center">{children}</div>
     </div>
+  )
+}
+
+// MoneyInput summani yozish paytida guruhlab ko'rsatadi ("1 250 000").
+// value/onChange xom qiymat bilan ishlaydi ("1250000"), shuning uchun parseMoney'ga to'g'ridan-to'g'ri beriladi.
+export function MoneyInput({ value, onChange, decimals = 2, allowNegative = false, ...rest }: {
+  value: string
+  onChange: (raw: string) => void
+  decimals?: number
+  allowNegative?: boolean
+  placeholder?: string
+  disabled?: boolean
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  // Formatlashdan keyin kursor joyini tiklash uchun: kursordan oldingi belgilar soni (bo'shliqsiz)
+  const caret = useRef<number | null>(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || caret.current === null) return
+    let seen = 0
+    let pos = 0
+    while (pos < el.value.length && seen < caret.current) {
+      if (el.value[pos] !== ' ') seen++
+      pos++
+    }
+    el.setSelectionRange(pos, pos)
+    caret.current = null
+  })
+
+  return (
+    <input
+      {...rest}
+      ref={ref}
+      inputMode="decimal"
+      autoComplete="off"
+      value={groupDigits(value)}
+      onChange={(e) => {
+        const raw = cleanAmount(e.target.value, decimals, allowNegative)
+        if (raw === null) return
+        const before = e.target.value.slice(0, e.target.selectionStart ?? e.target.value.length)
+        caret.current = before.replace(/\s/g, '').length - (e.target.value.replace(/\s/g, '').length - raw.length)
+        onChange(raw)
+      }}
+    />
   )
 }

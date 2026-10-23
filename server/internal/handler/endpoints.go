@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"monefy/internal/auth"
 	"monefy/internal/bot"
 	"monefy/internal/db"
 	"monefy/internal/service"
@@ -20,12 +21,44 @@ import (
 
 type meResponse struct {
 	*db.User
-	IsPremium bool `json:"is_premium"`
+	IsPremium     bool `json:"is_premium"`
+	IsAdmin       bool `json:"is_admin"`
+	PhoneRequired bool `json:"phone_required"`
+}
+
+func (h *Handler) meResp(r *http.Request, u *db.User) meResponse {
+	return meResponse{User: u, IsPremium: u.IsPremium(), IsAdmin: h.isAdmin(u), PhoneRequired: u.Phone == "" && !isDev(r)}
 }
 
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, h.meResp(r, userFrom(r)))
+}
+
+// savePhone WebApp.requestContact() javobini qabul qiladi. Imzo bot tokeni bilan tekshiriladi
+// va kontakt aynan shu foydalanuvchiniki ekanligi (user_id) solishtiriladi.
+func (h *Handler) savePhone(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
-	writeJSON(w, http.StatusOK, meResponse{User: u, IsPremium: u.IsPremium()})
+	var in struct {
+		Response string `json:"response"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	c, err := auth.ValidateContact(in.Response, h.cfg.BotToken, time.Hour)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, "bad_contact", "Kontakt tasdiqlanmadi")
+		return
+	}
+	if c.UserID != u.TelegramID {
+		writeErr(w, http.StatusForbidden, "not_own_phone", "Faqat o'zingizning raqamingizni ulashing")
+		return
+	}
+	updated, err := h.store.SetPhone(r.Context(), u.TelegramID, service.NormalizePhone(c.PhoneNumber))
+	if err != nil {
+		storeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, h.meResp(r, updated))
 }
 
 func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
@@ -46,9 +79,9 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "budjet musbat bo'lishi kerak")
 		return
 	}
-	// Bepul tarifda bitta valyuta: asosiy valyuta o'zgarsa barcha hisoblar ham o'zgaradi.
+	// Bepul tarifda bitta valyuta: asosiy valyuta o'zgarsa, shu valyutadagi hisoblar ham o'zgaradi.
 	if in.BaseCurrency != nil && *in.BaseCurrency != u.BaseCurrency && !u.IsPremium() {
-		if err := h.store.SetAllAccountsCurrency(r.Context(), u.ID, *in.BaseCurrency); err != nil {
+		if err := h.store.RenameBaseCurrency(r.Context(), u.ID, u.BaseCurrency, *in.BaseCurrency); err != nil {
 			internalErr(w, err)
 			return
 		}
@@ -60,7 +93,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		storeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, meResponse{User: updated, IsPremium: updated.IsPremium()})
+	writeJSON(w, http.StatusOK, h.meResp(r, updated))
 }
 
 // ---- accounts ----
@@ -75,7 +108,10 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 }
 
 // checkAccountInput nom va valyutani tekshiradi; boshqa valyuta faqat premium uchun.
-func checkAccountInput(w http.ResponseWriter, u *db.User, in *db.AccountInput, create bool) bool {
+// current — tahrirlanayotgan hisobning hozirgi valyutasi (yangi hisobda bo'sh): valyuta o'zgarmasa,
+// premium tugagan foydalanuvchi ham USD hisobini qayta nomlashi yoki arxivlashi mumkin.
+func checkAccountInput(w http.ResponseWriter, u *db.User, in *db.AccountInput, current string) bool {
+	create := current == ""
 	if in.Name != nil {
 		n := strings.TrimSpace(*in.Name)
 		in.Name = &n
@@ -96,7 +132,7 @@ func checkAccountInput(w http.ResponseWriter, u *db.User, in *db.AccountInput, c
 			badRequest(w, "valyuta kodi noto'g'ri")
 			return false
 		}
-		if *in.Currency != u.BaseCurrency && !u.IsPremium() {
+		if *in.Currency != u.BaseCurrency && *in.Currency != current && !u.IsPremium() {
 			writeErr(w, http.StatusPaymentRequired, "premium_required", "Boshqa valyutadagi hisob faqat Premium uchun")
 			return false
 		}
@@ -107,7 +143,7 @@ func checkAccountInput(w http.ResponseWriter, u *db.User, in *db.AccountInput, c
 func (h *Handler) createAccount(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	var in db.AccountInput
-	if !decode(w, r, &in) || !checkAccountInput(w, u, &in, true) {
+	if !decode(w, r, &in) || !checkAccountInput(w, u, &in, "") {
 		return
 	}
 	n, err := h.store.CountAccounts(r.Context(), u.ID)
@@ -131,7 +167,15 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	id, ok := idParam(w, r)
 	var in db.AccountInput
-	if !ok || !decode(w, r, &in) || !checkAccountInput(w, u, &in, false) {
+	if !ok || !decode(w, r, &in) {
+		return
+	}
+	existing, err := h.store.GetAccount(r.Context(), u.ID, id)
+	if err != nil {
+		storeErr(w, err)
+		return
+	}
+	if !checkAccountInput(w, u, &in, existing.Currency) {
 		return
 	}
 	a, err := h.store.UpdateAccount(r.Context(), u.ID, id, in)

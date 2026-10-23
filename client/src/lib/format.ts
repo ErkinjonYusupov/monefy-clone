@@ -97,3 +97,26 @@ export function periodRange(p: Period): { from?: string; to?: string; label: str
 export const PERIOD_LABELS: Record<PeriodType, string> = {
   day: 'Kun', week: 'Hafta', month: 'Oy', year: 'Yil', all: 'Hammasi',
 }
+
+// groupDigits kiritilayotgan xom qiymatni ("1250000.5") o'qishga qulay ko'rinishga
+// ("1 250 000,5") keltiradi. Yozish jarayonidagi holatlar ("12." , "-") saqlanadi.
+export function groupDigits(raw: string): string {
+  const neg = raw.startsWith('-')
+  const body = neg ? raw.slice(1) : raw
+  const dot = body.indexOf('.')
+  const int = dot === -1 ? body : body.slice(0, dot)
+  const frac = dot === -1 ? null : body.slice(dot + 1)
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return (neg ? '-' : '') + grouped + (frac === null ? '' : ',' + frac)
+}
+
+// cleanAmount foydalanuvchi kiritgan matndan xom qiymat oladi: bo'shliqlar olib tashlanadi,
+// vergul nuqtaga aylanadi. Noto'g'ri bo'lsa null.
+export function cleanAmount(input: string, decimals: number, allowNegative: boolean): string | null {
+  const s = input.replace(/\s/g, '').replace(',', '.')
+  const sign = allowNegative ? '-?' : ''
+  const re = new RegExp(`^${sign}\\d{0,15}(\\.\\d{0,${decimals}})?$`)
+  if (!re.test(s)) return null
+  // "007" -> "7", lekin "0.5" saqlanadi
+  return s.replace(/^(-?)0+(?=\d)/, '$1')
+}

@@ -2,17 +2,19 @@ package db
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
 const userCols = `id, telegram_id, first_name, last_name, username, language_code,
-	base_currency, budget_amount, premium_until, created_at`
+	base_currency, budget_amount, premium_until, created_at, last_seen_at, phone`
 
 func scanUser(row pgx.Row) (*User, error) {
 	var u User
 	err := row.Scan(&u.ID, &u.TelegramID, &u.FirstName, &u.LastName, &u.Username, &u.LanguageCode,
-		&u.BaseCurrency, &u.BudgetAmount, &u.PremiumUntil, &u.CreatedAt)
+		&u.BaseCurrency, &u.BudgetAmount, &u.PremiumUntil, &u.CreatedAt, &u.LastSeenAt, &u.Phone)
 	if err != nil {
 		return nil, notFound(err)
 	}
@@ -42,7 +44,7 @@ func (s *Store) UpsertUser(ctx context.Context, in UpsertUser) (u *User, created
 			in.TelegramID, in.FirstName, in.LastName, in.Username, in.LanguageCode)
 		var x User
 		if err := row.Scan(&x.ID, &x.TelegramID, &x.FirstName, &x.LastName, &x.Username, &x.LanguageCode,
-			&x.BaseCurrency, &x.BudgetAmount, &x.PremiumUntil, &x.CreatedAt, &created); err != nil {
+			&x.BaseCurrency, &x.BudgetAmount, &x.PremiumUntil, &x.CreatedAt, &x.LastSeenAt, &x.Phone, &created); err != nil {
 			return err
 		}
 		u = &x
@@ -52,6 +54,27 @@ func (s *Store) UpsertUser(ctx context.Context, in UpsertUser) (u *User, created
 		return nil
 	})
 	return u, created, err
+}
+
+// lastSeenEvery last_seen_at qanchalik tez-tez yangilanadi (statistika uchun shu aniqlik yetarli).
+const lastSeenEvery = 10 * time.Minute
+
+// AuthUser har bir API so'rovida chaqiriladi. Odatda faqat o'qiydi; bazaga faqat yangi foydalanuvchi
+// bo'lsa, Telegram profili o'zgargan bo'lsa yoki last_seen_at eskirgan bo'lsa yozadi.
+func (s *Store) AuthUser(ctx context.Context, in UpsertUser) (u *User, created bool, err error) {
+	u, err = s.UserByTelegramID(ctx, in.TelegramID)
+	if errors.Is(err, ErrNotFound) {
+		return s.UpsertUser(ctx, in)
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	changed := u.FirstName != in.FirstName || u.LastName != in.LastName ||
+		u.Username != in.Username || u.LanguageCode != in.LanguageCode
+	if changed || time.Since(u.LastSeenAt) > lastSeenEvery {
+		return s.UpsertUser(ctx, in)
+	}
+	return u, false, nil
 }
 
 func (s *Store) UserByTelegramID(ctx context.Context, telegramID int64) (*User, error) {

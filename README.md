@@ -71,6 +71,22 @@ Lokal server ham shu tokenni ishlatsa, lokalda `BOT_POLLING=false` qiling.
 | `DEV_TELEGRAM_ID` | Faqat lokal test |
 | `BOT_POLLING` | `false` bo'lsa bot xabarlarni qabul qilmaydi |
 
+## Telefon raqami
+
+Mini App ochilganda Telegram'ning "raqamni ulashish" oynasi chiqadi; raqam ulashilmaguncha
+ilovadan foydalanib bo'lmaydi (server ham `403 phone_required` qaytaradi).
+Raqam o'ziniki ekanligi tekshiriladi: Telegram kontaktni bot tokeni bilan imzolaydi,
+server imzoni va kontaktdagi `user_id` kirgan foydalanuvchiga tengligini tekshiradi.
+Kontakt botga ham xabar bo'lib keladi va bot ham xuddi shu tekshiruv bilan saqlaydi.
+Lokal dev rejimda (`DEV_TELEGRAM_ID`) raqam so'ralmaydi.
+
+## Admin panel
+
+`ADMIN_CHAT_ID` ga teng Telegram ID bilan kirgan foydalanuvchi menyuda "Admin panel" ni ko'radi:
+statistika, foydalanuvchilar ro'yxati (sahifalab, ism / username / telefon / ID bo'yicha qidiruv),
+1 hafta, 1 oy, 3 oy, 6 oy, 1 yil premium berish (to'langan summa bilan) va bekor qilish.
+Premium berilganda foydalanuvchiga bot orqali xabar boradi.
+
 ## Premium
 
 Monefy Pro'dagi kabi quyidagilar faqat premium uchun ochiq:
@@ -86,10 +102,15 @@ Admin chatidagi buyruqlar:
 ```
 /stats                               foydalanuvchilar va tushum
 /user <telegram_id>                  foydalanuvchi va obunalar tarixi
-/grant <telegram_id> year            reja narxi bilan premium berish
+/grant <telegram_id> year            reja narxi bilan premium berish (week, month, 3month, 6month, year, lifetime)
 /grant <telegram_id> 30d 0           ixtiyoriy muddat, bepul
 /revoke <telegram_id>                premiumni bekor qilish
 ```
+
+Muddat tugashiga 3 kun qolganda va tugaganda foydalanuvchiga bot orqali eslatma boradi
+(tugaganda adminga ham). Server soatiga bir marta tekshiradi, har bir muddat uchun eslatma bir marta yuboriladi.
+Muddat tugagach ma'lumotlar saqlanadi: boshqa valyutadagi hisoblar va o'z kategoriyalari ishlatilaveradi,
+faqat yangilarini qo'shish/tahrirlash va eksport yopiladi.
 
 Click ulanganda `subscriptions.source = 'click'` va `provider_txn_id` (UNIQUE) ishlatiladi.
 Callback handler `store.GrantSubscription` ni chaqiradi.

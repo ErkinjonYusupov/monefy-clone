@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CategoryBadge } from '../components/ui'
 import { api } from '../lib/api'
-import { currencyLabel, parseMoney, toInput, ymd } from '../lib/format'
+import { currencyLabel, groupDigits, parseMoney, toInput, ymd } from '../lib/format'
 import { useApp } from '../lib/store'
 import { alertDialog, confirmDialog, haptic } from '../lib/telegram'
 import type { Kind } from '../lib/types'
@@ -93,7 +93,7 @@ export default function TxForm() {
       </header>
 
       <div className="amount-display">
-        <span>{amount || '0'}</span>
+        <span>{groupDigits(amount) || '0'}</span>
         <small>{currencyLabel(currency)}</small>
       </div>
 
@@ -108,7 +108,7 @@ export default function TxForm() {
       <div className="cat-grid">
         {cats.map((c) => (
           <button key={c.id} className={`cat-cell ${c.id === category ? 'selected' : ''}`} onClick={() => { haptic(); setCategory(c.id) }}>
-            <CategoryBadge icon={c.icon} color={c.color} size={42} />
+            <CategoryBadge icon={c.icon} color={c.color} size={36} />
             <span>{c.name}</span>
           </button>
         ))}
@@ -116,7 +116,7 @@ export default function TxForm() {
 
       <div className="keypad">
         {KEYS.map((k) => (
-          <button key={k} onClick={() => press(k)}>{k === 'del' ? <Delete size={22} /> : k}</button>
+          <button key={k} onClick={() => press(k)}>{k === 'del' ? <Delete size={22} /> : k === '.' ? ',' : k}</button>
         ))}
       </div>
       <button className="btn primary save" disabled={saving} onClick={save}>
