@@ -29,6 +29,15 @@ func main() {
 	}
 }
 
+// staticDir React build papkasi. Docker image'da u binary yonida (/app/web) turadi;
+// lokalda bu papka yo'q, sahifani Vite dev server beradi.
+func staticDir() string {
+	if st, err := os.Stat("web"); err == nil && st.IsDir() {
+		return "web"
+	}
+	return ""
+}
+
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -56,7 +65,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           handler.New(cfg, store, b).Routes(os.Getenv("STATIC_DIR")),
+		Handler:           handler.New(cfg, store, b).Routes(staticDir()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {

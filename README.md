@@ -70,7 +70,6 @@ Lokal server ham shu tokenni ishlatsa, lokalda `BOT_POLLING=false` qiling.
 | `CORS_ORIGINS` | Frontend boshqa domenda bo'lsa |
 | `DEV_TELEGRAM_ID` | Faqat lokal test |
 | `BOT_POLLING` | `false` bo'lsa bot xabarlarni qabul qilmaydi |
-| `STATIC_DIR` | React build papkasi (Docker image'da `/app/web`, avtomatik) |
 
 ## Premium
 

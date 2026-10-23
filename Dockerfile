@@ -18,8 +18,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata && adduser -D -H app
 ENV TZ=Asia/Tashkent \
-    PORT=8080 \
-    STATIC_DIR=/app/web
+    PORT=8080
 WORKDIR /app
 COPY --from=api /out/api /app/api
 COPY --from=web /app/dist /app/web

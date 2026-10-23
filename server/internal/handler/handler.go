@@ -31,7 +31,7 @@ func New(cfg *config.Config, store *db.Store, b *bot.Bot) *Handler {
 	return &Handler{cfg: cfg, store: store, bot: b}
 }
 
-// Routes API marshrutlari. staticDir berilsa, React build ham shu serverdan beriladi.
+// Routes API marshrutlari. staticDir bo'sh bo'lmasa, React build ham shu serverdan beriladi.
 func (h *Handler) Routes(staticDir string) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP, middleware.Recoverer, h.cors)
